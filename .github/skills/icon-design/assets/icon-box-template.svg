@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <g id="canvas">
+    <rect width="24" height="24" fill="#fff"/>
+  </g>
+  <g id="square-17">
+    <rect x="3.5" y="3.5" width="17" height="17" fill="#000" opacity=".1"/>
+  </g>
+  <g id="vertical-15x19">
+    <rect x="4.5" y="2.5" width="15" height="19" fill="#000" opacity=".1"/>
+  </g>
+  <g id="horizontal-19x15">
+    <rect x="2.5" y="4.5" width="19" height="15" fill="#000" opacity=".1"/>
+  </g>
+  <g id="circle-19">
+    <circle cx="12" cy="12" r="9.5" fill="#000" opacity=".1"/>
+  </g>
+</svg>
