@@ -1,5 +1,5 @@
 ---
-name: icon-design
+name: SUNMI-icon-design-skill
 description: "设计、补齐、重绘、校正、审查和交付 24×24 单色图标、线性图标、填充图标、Line/Fill 成对图标与 SVG 图标集。Use when: 用户要求设计 icon/图标、扩展图标库、根据图标盒/光学盒校正实际大小、从 Figma 图标稿提炼风格、制作 line/fill 变体、统一视觉重量、命名分类、输出或检查 SVG、进行 icon audit/review。"
 argument-hint: "描述图标语义、Line/Fill、目标平台、现有参考和期望输出"
 user-invocable: true
