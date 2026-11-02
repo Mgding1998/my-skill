@@ -6,17 +6,17 @@
 
 | Skill | 状态 | 用途 | 入口 |
 |---|---|---|---|
-| SUNMI Icon Design | 可用 | 严格按 SUNMI 规范设计、重绘、校正和审查 24×24 图标 | [SKILL.md](./.github/skills/SUNMI-icon-design-skill/SKILL.md) |
+| SUNMI Icon Design | 可用 | 严格按 SUNMI 规范设计、重绘、校正和审查 24×24 图标 | [SKILL.md](./.github/skills/sunmi-icon-design-skill/SKILL.md) |
 
 新增 Skill 时，在此表追加一行，避免使用彼此重叠或含义模糊的名称。
 
 ## SUNMI Icon Design
 
-[`SUNMI-icon-design-skill`](./.github/skills/SUNMI-icon-design-skill/) 用于交付符合 SUNMI 视觉体系的单色 SVG 图标，包括 Line、Fill、Line/Fill 成对图标及图标集审查。
+[`sunmi-icon-design-skill`](./.github/skills/sunmi-icon-design-skill/) 用于交付符合 SUNMI 视觉体系的单色 SVG 图标，包括 Line、Fill、Line/Fill 成对图标及图标集审查。
 
 ### 核心能力
 
-- 使用固定的 24×24 画布和四类光学盒校正实际图形尺寸
+- 使用固定的 24×24 画布和新版图标盒参考轮廓校正实际图形尺寸
 - 以约 1.86–2 px 的主视觉重量统一轮廓
 - 分别设计 Line 和 Fill，而不是机械加粗或合并路径
 - 检查视觉中心、负空间、黑色面积和小尺寸辨识度
@@ -28,14 +28,14 @@
 ### 调用示例
 
 ```text
-使用 SUNMI-icon-design-skill，设计一个 24×24 的“文件检验”图标。
+使用 sunmi-icon-design-skill，设计一个 24×24 的“文件检验”图标。
 需要 Line 和 Fill 两个版本，严格按照 SUNMI 视觉规范和光学盒要求交付。
 ```
 
 如果提供了参考图，可以这样说明：
 
 ```text
-使用 SUNMI-icon-design-skill，根据这张参考图提取图标语义，
+使用 sunmi-icon-design-skill，根据这张参考图提取图标语义，
 但不要继承参考图的圆角、线宽和造型风格，最终严格执行 SUNMI 规范。
 ```
 
@@ -43,10 +43,10 @@
 
 ```bash
 python3 -m unittest discover \
-  -s .github/skills/SUNMI-icon-design-skill/scripts \
+  -s .github/skills/sunmi-icon-design-skill/scripts \
   -p 'test_*.py' -v
 
-python3 .github/skills/SUNMI-icon-design-skill/scripts/validate_svg.py \
+python3 .github/skills/sunmi-icon-design-skill/scripts/validate_svg.py \
   path/to/icons --require-pairs --strict
 ```
 
@@ -55,7 +55,7 @@ python3 .github/skills/SUNMI-icon-design-skill/scripts/validate_svg.py \
 ```text
 .github/
 └── skills/
-    ├── SUNMI-icon-design-skill/
+    ├── sunmi-icon-design-skill/
     │   ├── SKILL.md
     │   ├── assets/
     │   ├── references/
