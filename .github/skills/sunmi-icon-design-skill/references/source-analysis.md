@@ -107,6 +107,19 @@ Fill 是独立重绘，而不是简单把 Line 的空心区域填满：
 
 因此 Line/Fill 应共享语义、方向、视觉中心和总体尺寸，但不要求拓扑一致。
 
+### Line/Fill 共享转角语言
+
+2026-11-02 重新读取原始 Figma 中 6 组 Line/Fill 实例及其实际 SVG 路径，进一步区分“拓扑不同”和“造型性格不同”：
+
+- [`landscape-line` `16:5260`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-5260) / [`landscape-fill` `16:5882`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-5882)：两种变体都用直线段和明确顶点表达三角山峰，属于 Sharp。
+- [`gallery-line` `16:5210`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-5210) / [`gallery-fill` `16:5832`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-5832)：两种变体都用连续贝塞尔曲线表达地形，属于 Organic。
+- [`home-line` `16:14806`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-14806) / [`home-fill` `16:14958`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-14958)：Fill 移除内部孔洞，但保留与 Line 相同的屋顶轮廓和受控柔化，属于 Soft。
+- [`album-line` `16:5075`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-5075) / [`album-fill` `16:5697`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-5697)：黑白关系变化，但主体都保持同心圆形语言。
+- [`image-line` `16:5255`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-5255) / [`image-fill` `16:5877`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-5877)：Fill 对山峰顶点做轻微光学缓和，但仍保留明确几何峰、直线坡面和相同方向，没有变成宽圆丘。
+- [`slideshow-line` `16:14170`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-14170) / [`slideshow-fill` `16:14677`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Untitled?node-id=16-14677)：内部图表的圆形、方形切口与水平直线在两种变体中保持相同几何类别。
+
+因此“不要求拓扑一致”只允许重新组织黑白面积、孔洞和局部细节，不允许无依据地改变对应语义部件的视觉转角类别。成对设计应先为关键部件标记 Sharp、Soft 或 Organic；精确控制点和局部半径可以为光学效果调整，但不能改变主要棱角感、曲直属性、关键顶点顺序或峰谷方向。Mixed 只在同家族 Figma 证据明确支持时使用。
+
 ### 单态 Editor 图标
 
 Editor 分类包含对齐、文字样式、列表、表格、输入法、数字和公式等符号。它们：
@@ -179,6 +192,7 @@ Editor 单态板：
 - 正圆及以正圆为核心外边界的图标严格为 19×19；所有图形都不得通过修改 `viewBox` 或非等比拉伸伪造尺寸。
 - 主重量从约 1.86–2 px 开始，再做光学校正。
 - Line 最终使用填充轮廓，Fill 需要独立重绘。
+- Line/Fill 可以不同构，但对应语义部件必须保持同一视觉转角类别、关键顶点顺序和主要曲直属性。
 - 默认生成完整 Line/Fill 对；Editor/排版符号和明确例外可保持单态。
 - 命名、配对和真实库存必须自动校验。
 - 产品 SVG 必须从 Figma 原始黑色导出规范化为 `currentColor`。
