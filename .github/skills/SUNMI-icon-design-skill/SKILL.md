@@ -1,6 +1,6 @@
 ---
 name: SUNMI-icon-design-skill
-description: "严格按 SUNMI 视觉规范设计、补齐、重绘、校正、审查和交付 24×24 单色图标、线性图标、填充图标、Line/Fill 成对图标与 SVG 图标集；外部参考图只用于提取语义和必要结构，不继承其圆角、线宽或造型风格。Use when: 用户要求设计 icon/图标、扩展图标库、将参考图规范化为 SUNMI 风格、根据图标盒/光学盒校正实际大小、制作 line/fill 变体、统一视觉重量、命名分类、输出或检查 SVG、进行 icon audit/review。"
+description: "严格按 SUNMI 视觉规范设计、补齐、重绘、校正、审查和交付 24×24 单色图标、线性图标、填充图标、Line/Fill 成对图标与 SVG 图标集；Line SVG 粘贴到 Figma 后保留 Original 可编辑描边与 Outlined 填充轮廓两层。外部参考图只用于提取语义和必要结构，不继承其圆角、线宽或造型风格。Use when: 用户要求设计 icon/图标、扩展图标库、将参考图规范化为 SUNMI 风格、根据图标盒/光学盒校正实际大小、制作 line/fill 变体、统一视觉重量、命名分类、输出或检查 SVG、进行 icon audit/review。"
 argument-hint: "描述图标语义、Line/Fill、目标平台、现有参考和期望输出"
 user-invocable: true
 disable-model-invocation: false
@@ -17,7 +17,7 @@ disable-model-invocation: false
 - 单色、透明背景
 - Line / Fill 成对体系
 - 约 1.86–2 px 的主视觉重量
-- 最终 SVG 使用填充轮廓，而不是运行时 stroke
+- Line SVG 的可见层使用填充轮廓，同时保留隐藏的可编辑描边源层
 - 产品 SVG 使用 `currentColor`
 
 详细证据见[源文件分析](./references/source-analysis.md)，完整造型规则见[视觉语言](./references/visual-language.md)。
@@ -106,7 +106,12 @@ disable-model-invocation: false
   - 圆形轮廓：直径 19，边界 `2.5–21.5`
 - 主视觉重量以约 `1.86–2 px` 为起点；同一图标内不要随意混用重量。
 - 实用符号可使用方形端点；有机轮廓使用连续曲线和协调转折。
-- 用闭合填充轮廓表达“线”，最终不要依赖 SVG stroke。
+- 先用可编辑 stroke 建立 `Original` 源几何，明确设置线宽、端点和连接方式；再复制并扩展为闭合填充轮廓 `Outlined`。
+- `Original` 与 `Outlined` 必须使用同一中心线逻辑并精确重合；轮廓化后不得出现端点位移、交叉处增厚、孔洞变化或包围盒漂移。
+- 最终 Line SVG 固定包含两个顶层组，顺序为隐藏的 `<g id="Original" display="none">` 和可见的 `<g id="Outlined">`：
+  - `Original` 保留 `stroke="currentColor"`、显式 `stroke-width`、`stroke-linecap` 和 `stroke-linejoin`，用于粘贴到 Figma 后继续编辑。
+  - `Outlined` 只使用 `fill="currentColor"` 的闭合轮廓，不含可见 stroke，作为产品实际渲染层。
+- 产品渲染不得依赖隐藏的 `Original`；Fill 版本和无 Line 语义的单态图标不强制复制双层结构。
 - 需要孔洞时使用复合路径和稳定的负空间。
 - 包围盒包含所有可见轮廓、修饰符和扩展后的线宽；没有家族证据时不得越过所选光学盒。
 
@@ -152,6 +157,8 @@ disable-model-invocation: false
 - 禁止复制后缀、空格、临时中文名或无语义编号，例如 `icon 1`、`snowflake-line 1`、`必填`。
 - 新增成对图标时同时更新库存、分类和标注数量。
 - 在 Figma 中优先建立组件集，以 `Style=Line|Fill` 表达变体；24 px 为母版，不为每个显示尺寸复制路径。
+- Line SVG 粘贴到 Figma 后必须出现两个同级顶层图层：`Original` 在下且默认隐藏，`Outlined` 在上且默认显示；不要增加会形成第三个图层的顶层几何或包装组。
+- 切换两层可见性时，两者在 16/20/24/32 px 的轮廓、端点、孔洞和可见包围盒必须一致。
 - 需要制作目录板时，遵循[视觉语言](./references/visual-language.md)中的 Catalog Board 规则。
 
 ### 8. 导出与接入
@@ -159,8 +166,8 @@ disable-model-invocation: false
 遵循[交付与无障碍](./references/delivery-and-accessibility.md)：
 
 - `viewBox="0 0 24 24"`
-- 几何使用 `fill="currentColor"`
-- 无位图、文字、滤镜、脚本和运行时 stroke
+- `Outlined` 和 Fill 几何使用 `fill="currentColor"`；Line 的隐藏 `Original` 使用 `stroke="currentColor"`
+- 无位图、文字、滤镜、脚本；除 Line SVG 的隐藏 `Original` 外，不得出现 stroke
 - 移除 Figma 导出的内联样式与 `preserveAspectRatio="none"`
 - 保持透明背景，不在图标资产中加入按钮底板
 - 由调用方负责可访问名称、装饰性隐藏、触控热区和状态色
@@ -170,20 +177,21 @@ disable-model-invocation: false
 1. 按[质量检查清单](./references/qa-checklist.md)逐项检查。
 2. 将成品与外部参考并排检查，确认相似性只存在于语义和必要结构，圆角、重量、端点、比例、负空间及 Fill 策略均来自 SUNMI 规范。
 3. 记录盒型、目标包围盒和最终可见包围盒；高分辨率栅格测量时允许约 0.1 px 抗锯齿误差。
-4. 对 SVG 运行[校验脚本](./scripts/validate_svg.py)：
+4. 对 Line SVG 先检查顶层图层顺序、`Original` 默认隐藏、`Outlined` 默认显示，并分别单独显示两层做轮廓重合检查。
+5. 对 SVG 运行[校验脚本](./scripts/validate_svg.py)：
 
    ```bash
    python3 .github/skills/SUNMI-icon-design-skill/scripts/validate_svg.py path/to/icons --require-pairs --strict
    ```
 
-5. 对刚从 Figma 导出的黑色原稿可先运行：
+6. 对刚从 Figma 导出的黑色原稿可先运行：
 
    ```bash
    python3 .github/skills/SUNMI-icon-design-skill/scripts/validate_svg.py path/to/raw-icons --allow-black
    ```
 
    交付前仍须改为 `currentColor` 并通过默认检查。
-6. 若改动现有应用，验证真实渲染位置、颜色继承、有效尺寸和可访问名称，而不只检查 SVG 文件。
+7. 若改动现有应用，验证真实渲染位置、颜色继承、有效尺寸和可访问名称，而不只检查 SVG 文件。
 
 可用[审查报告模板](./assets/review-report-template.md)记录问题。
 
@@ -194,6 +202,7 @@ disable-model-invocation: false
 - 设计或修改了哪些图标和变体
 - 使用了哪些 SUNMI 家族参考、从外部参考提取了哪些语义，以及主动舍弃了哪些外部风格
 - 采用的光学盒类型、目标尺寸和实测包围盒
+- Line SVG 的 `Original` / `Outlined` 双层结构与重合检查结果
 - 交付位置和命名
 - 执行了哪些视觉及自动检查
 - 是否存在有意保留的例外

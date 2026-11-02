@@ -25,7 +25,11 @@
 
 ## 3. Line
 
-- [ ] 最终使用填充轮廓，而不是可见 stroke
+- [ ] 顶层只有 `Original`、`Outlined` 两个组，顺序正确
+- [ ] `Original` 使用 `display="none"`，保留可编辑 `currentColor` stroke 及显式线宽、端点、连接方式
+- [ ] `Outlined` 默认显示，只使用 `currentColor` 填充轮廓，不含可见 stroke
+- [ ] 分别单独显示两层时，轮廓、端点、孔洞、交叉关系和联合包围盒重合
+- [ ] 粘贴到 Figma 后形成两个同级命名图层，没有额外顶层包装或几何图层
 - [ ] 同级轮廓重量一致
 - [ ] 相交位置没有意外变粗
 - [ ] 孔洞和缝隙在 16 px 仍清晰
@@ -56,7 +60,7 @@
 - [ ] 使用 `currentColor`
 - [ ] 无 `preserveAspectRatio="none"`
 - [ ] 无内联 style、脚本、位图、文字、滤镜或动画
-- [ ] 无运行时 stroke
+- [ ] 除 Line 的隐藏 `Original` 外无 stroke，实际渲染不依赖 stroke
 - [ ] 无临时 Figma URL 或编辑器垃圾数据
 - [ ] 文件在目标浏览器/框架中真实渲染过
 - [ ] 校验脚本通过
