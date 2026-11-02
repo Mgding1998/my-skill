@@ -40,7 +40,6 @@ BLACK_VALUES = {
     "rgb(0,0,0)",
     "rgba(0,0,0,1)",
 }
-LINE_LAYER_IDS = ("Original", "Outlined")
 
 
 @dataclass(frozen=True)
@@ -93,11 +92,6 @@ def normalized_paint(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip()).lower()
 
 
-def is_allowed_color(value: str, allow_black: bool) -> bool:
-    normalized = normalized_paint(value)
-    return normalized == "currentcolor" or (allow_black and normalized in BLACK_VALUES)
-
-
 def validate_file(path: Path, allow_black: bool = False) -> list[Issue]:
     issues: list[Issue] = []
 
@@ -136,100 +130,16 @@ def validate_file(path: Path, allow_black: bool = False) -> list[Issue]:
     if root.get("style"):
         issues.append(Issue("WARN", path, "Remove inline style from the SVG root."))
 
-    is_line_icon = path.stem.endswith("-line")
-    original_layer: ET.Element | None = None
-    outlined_layer: ET.Element | None = None
-
-    if is_line_icon:
-        top_level_graphics = [
-            child for child in root if local_name(child.tag) not in {"desc", "title"}
-        ]
-        layer_ids = tuple(
-            child.get("id", "") if local_name(child.tag) == "g" else ""
-            for child in top_level_graphics
-        )
-        if layer_ids != LINE_LAYER_IDS:
-            issues.append(
-                Issue(
-                    "ERROR",
-                    path,
-                    "Line SVG must contain exactly two top-level <g> layers in this order: "
-                    "Original, Outlined.",
-                )
-            )
-        else:
-            original_layer, outlined_layer = top_level_graphics
-            if normalized_paint(original_layer.get("display", "")) != "none":
-                issues.append(
-                    Issue(
-                        "ERROR",
-                        path,
-                        'Original layer must use display="none" so it is hidden by default.',
-                    )
-                )
-            outlined_style = parse_style(outlined_layer.get("style"))
-            outlined_display = outlined_style.get(
-                "display", outlined_layer.get("display", "")
-            )
-            outlined_visibility = outlined_style.get(
-                "visibility", outlined_layer.get("visibility", "")
-            )
-            if normalized_paint(outlined_display) == "none" or normalized_paint(
-                outlined_visibility
-            ) in {"hidden", "collapse"}:
-                issues.append(
-                    Issue("ERROR", path, "Outlined layer must be visible by default.")
-                )
-
     vector_count = 0
     visible_fill_count = 0
-    original_stroke_count = 0
-    outlined_fill_count = 0
 
-    def walk(
-        element: ET.Element,
-        inherited_fill: str,
-        inherited_stroke: str,
-        inherited_stroke_width: str,
-        inherited_linecap: str,
-        inherited_linejoin: str,
-        inherited_hidden: bool,
-        line_layer: str | None,
-    ) -> None:
+    def walk(element: ET.Element, inherited_fill: str, inherited_stroke: str) -> None:
         nonlocal vector_count, visible_fill_count
-        nonlocal original_stroke_count, outlined_fill_count
 
         tag = local_name(element.tag)
         style = parse_style(element.get("style"))
         fill = style.get("fill", element.get("fill", inherited_fill))
         stroke = style.get("stroke", element.get("stroke", inherited_stroke))
-        stroke_width = style.get(
-            "stroke-width", element.get("stroke-width", inherited_stroke_width)
-        )
-        linecap = style.get(
-            "stroke-linecap", element.get("stroke-linecap", inherited_linecap)
-        )
-        linejoin = style.get(
-            "stroke-linejoin", element.get("stroke-linejoin", inherited_linejoin)
-        )
-        display = style.get("display", element.get("display", ""))
-        visibility = style.get("visibility", element.get("visibility", ""))
-        opacity = style.get("opacity", element.get("opacity", ""))
-        try:
-            fully_transparent = bool(opacity) and float(opacity) == 0.0
-        except ValueError:
-            fully_transparent = False
-        hidden = (
-            inherited_hidden
-            or normalized_paint(display) == "none"
-            or normalized_paint(visibility) in {"hidden", "collapse"}
-            or fully_transparent
-        )
-
-        if element is original_layer:
-            line_layer = "Original"
-        elif element is outlined_layer:
-            line_layer = "Outlined"
 
         if tag in FORBIDDEN_TAGS:
             issues.append(Issue("ERROR", path, f"Forbidden SVG element <{tag}>."))
@@ -251,74 +161,20 @@ def validate_file(path: Path, allow_black: bool = False) -> list[Issue]:
             normalized_stroke = normalized_paint(stroke)
 
             if normalized_stroke not in {"", "none"}:
-                if (
-                    is_line_icon
-                    and line_layer == "Original"
-                    and hidden
-                    and is_allowed_color(stroke, allow_black)
-                ):
-                    original_stroke_count += 1
-                    if parse_length(stroke_width) is None or parse_length(stroke_width) <= 0:
-                        issues.append(
-                            Issue(
-                                "ERROR",
-                                path,
-                                f"Original stroke on <{tag}> must define a positive stroke-width.",
-                            )
-                        )
-                    if normalized_paint(linecap) not in {"butt", "round", "square"}:
-                        issues.append(
-                            Issue(
-                                "ERROR",
-                                path,
-                                f"Original stroke on <{tag}> must define stroke-linecap.",
-                            )
-                        )
-                    if normalized_paint(linejoin) not in {"miter", "round", "bevel"}:
-                        issues.append(
-                            Issue(
-                                "ERROR",
-                                path,
-                                f"Original stroke on <{tag}> must define stroke-linejoin.",
-                            )
-                        )
-                elif (
-                    is_line_icon
-                    and line_layer == "Original"
-                    and hidden
-                ):
-                    issues.append(
-                        Issue(
-                            "ERROR",
-                            path,
-                            f'Original stroke on <{tag}> must use currentColor; found "{stroke}".',
-                        )
-                    )
-                else:
-                    issues.append(
-                        Issue(
-                            "ERROR",
-                            path,
-                            f"Stroke on <{tag}> is allowed only inside the hidden Original "
-                            "layer of a Line SVG.",
-                        )
-                    )
-
-            if line_layer == "Original" and normalized_fill not in {"", "none"}:
                 issues.append(
                     Issue(
                         "ERROR",
                         path,
-                        f'Original geometry on <{tag}> must use fill="none"; found "{fill}".',
+                        f"Visible stroke on <{tag}> must be expanded to filled geometry.",
                     )
                 )
-            elif is_allowed_color(fill, allow_black):
-                if not hidden:
-                    visible_fill_count += 1
-                    if line_layer == "Outlined":
-                        outlined_fill_count += 1
+
+            if normalized_fill == "currentcolor":
+                visible_fill_count += 1
             elif normalized_fill in {"", "none"}:
                 pass
+            elif allow_black and normalized_fill in BLACK_VALUES:
+                visible_fill_count += 1
             else:
                 issues.append(
                     Issue(
@@ -332,18 +188,9 @@ def validate_file(path: Path, allow_black: bool = False) -> list[Issue]:
                 issues.append(Issue("ERROR", path, "<path> must have non-empty d data."))
 
         for child in element:
-            walk(
-                child,
-                fill,
-                stroke,
-                stroke_width,
-                linecap,
-                linejoin,
-                hidden,
-                line_layer,
-            )
+            walk(child, fill, stroke)
 
-    walk(root, "black", "none", "", "", "", False, None)
+    walk(root, "black", "none")
 
     if vector_count == 0:
         issues.append(Issue("ERROR", path, "SVG must contain vector geometry."))
@@ -353,23 +200,6 @@ def validate_file(path: Path, allow_black: bool = False) -> list[Issue]:
                 "ERROR",
                 path,
                 "SVG has no visible currentColor fill geometry.",
-            )
-        )
-
-    if is_line_icon and original_layer is not None and original_stroke_count == 0:
-        issues.append(
-            Issue(
-                "ERROR",
-                path,
-                "Original layer must contain editable currentColor stroke geometry.",
-            )
-        )
-    if is_line_icon and outlined_layer is not None and outlined_fill_count == 0:
-        issues.append(
-            Issue(
-                "ERROR",
-                path,
-                "Outlined layer must contain visible currentColor fill geometry.",
             )
         )
 
@@ -429,13 +259,13 @@ def collect_svg_paths(inputs: list[str]) -> list[Path]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Validate 24x24 monochrome SVG icons and dual-layer Line assets."
+        description="Validate 24x24 monochrome SVG icons for production delivery."
     )
     parser.add_argument("paths", nargs="+", help="SVG files or directories to scan recursively.")
     parser.add_argument(
         "--allow-black",
         action="store_true",
-        help="Allow black paints when auditing raw Figma exports. Production should use currentColor.",
+        help="Allow black fills when auditing raw Figma exports. Production should use currentColor.",
     )
     parser.add_argument(
         "--require-pairs",

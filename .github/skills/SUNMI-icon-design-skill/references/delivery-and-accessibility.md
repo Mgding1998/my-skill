@@ -2,31 +2,11 @@
 
 ## SVG 交付契约
 
-Fill 或单态图标推荐结构：
+推荐结构：
 
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
   <path fill="currentColor" d="..."/>
-</svg>
-```
-
-Line 图标必须使用可粘贴到 Figma 的双层结构：
-
-```svg
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <g id="Original" display="none">
-    <path
-      d="..."
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="butt"
-      stroke-linejoin="miter"
-    />
-  </g>
-  <g id="Outlined">
-    <path fill="currentColor" d="..."/>
-  </g>
 </svg>
 ```
 
@@ -36,19 +16,14 @@ Line 图标必须使用可粘贴到 Figma 的双层结构：
 - 24×24 是固定画布；内部可见几何必须符合[光学盒规则](./optical-sizing.md)，不能通过修改 `viewBox` 校正大小。
 - 可以保留 `width="24"` 和 `height="24"` 作为默认尺寸，也可以由组件层设置。
 - 路径使用 `currentColor`，不要写死黑色。
-- `*-line.svg` 必须且只能有两个顶层图形组，顺序为 `Original`、`Outlined`；使用 `id` 保证粘贴到 Figma 后得到同名图层。
-- `Original` 必须使用属性 `display="none"` 默认隐藏，保留可编辑 stroke，并显式写出 `stroke-width`、`stroke-linecap` 和 `stroke-linejoin`。
-- `Outlined` 必须默认显示，只包含已轮廓化的填充几何，不含可见 stroke；产品渲染只依赖这一层。
-- 两层单独显示时必须具有相同的视觉轮廓、端点、孔洞、交叉关系和联合包围盒。
-- Fill 与无 Line 语义的单态图标继续使用填充结构，不添加空的 `Original`。
 - 根节点不要使用 `preserveAspectRatio="none"`。
 - 不包含 `style`、`script`、`image`、`text`、`foreignObject`、滤镜或动画。
-- 除隐藏的 `Original` 外不使用 stroke；任何实际显示的 stroke 都必须先扩展到 `Outlined`。
+- 最终资产不使用可见 stroke；在设计工具中用过的 stroke 应先扩展。
 - 保持透明背景。
-- 不在文件中保留临时 Figma 下载 URL、编辑器元数据或除 `Original` / `Outlined` 外的无意义图层。
-- 每个组内可以合并路径，但不要为了单路径破坏孔洞、填充规则或可维护性。
+- 不在文件中保留临时 Figma 下载 URL、编辑器元数据或无意义图层。
+- 可以合并路径，但不要为了单路径破坏孔洞、填充规则或可维护性。
 
-Fill/单态参考骨架见[icon-template.svg](../assets/icon-template.svg)，Line 参考骨架见[icon-template-line.svg](../assets/icon-template-line.svg)。
+参考骨架见[icon-template.svg](../assets/icon-template.svg)。
 
 ## 颜色与状态
 
@@ -102,8 +77,6 @@ Fill/单态参考骨架见[icon-template.svg](../assets/icon-template.svg)，Lin
 - 使用 24×24 组件母版。
 - 叠加[图标盒模板](../assets/icon-box-template.svg)，为组件记录方形、竖向、横向或圆形盒型。
 - 导出前隐藏或移除光学盒辅助图层，不把辅助底色写入图标资产。
-- Line SVG 粘贴后确认存在两个同级图层：隐藏的 `Original` 可编辑描边层和可见的 `Outlined` 轮廓填充层。
-- 分别单独显示 `Original` 与 `Outlined`，确认二者轮廓和包围盒重合；正常交付状态只显示 `Outlined`。
 - Line/Fill 作为同一组件集的 `Style` 变体。
 - 保持组件原点、边界和命名一致。
 - 将颜色绑定到可继承的前景色变量；若源文件尚无变量，至少不要在多个图层中散落不同黑色值。

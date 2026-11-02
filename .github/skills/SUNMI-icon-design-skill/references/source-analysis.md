@@ -90,16 +90,6 @@ Figma 节点 [`18:6006`](https://www.figma.com/design/pyMO9In9eCGPIYz73JhWH3/Unt
 - 实用型直线端点多为方形；有机图形以连续贝塞尔曲线连接。
 - 代表样本均可由单个 `<path>` 表达，但单路径是优化目标，不应压过正确性。
 
-### Line 双层交付参考
-
-用户提供的 [`IDE_ic_容器`](https://www.figma.com/design/O1FjJ6rcdtBExhx4FREmum/IDE-%E5%9B%BE%E6%A0%87%E5%BA%93--%E6%9C%89%E5%9C%86%E8%A7%92%EF%BC%89?node-id=2065-425&m=dev) 节点包含两个同级图层：
-
-- `Original`：默认隐藏的布尔并集，内部保留 4 条 2 px、居中对齐的可编辑描边。
-- `Outlined`：默认显示的布尔并集，使用无 stroke 的填充轮廓。
-- 两层均为 24×24，并表达相同的最终轮廓。
-
-因此新的 Line 交付契约在既有“可见层必须为填充轮廓”规则之上，增加隐藏的 `Original` 描边源层。该源层只用于粘贴到 Figma 后继续编辑；产品渲染仍完全由 `Outlined` 负责。
-
 ### Fill 构造
 
 Fill 是独立重绘，而不是简单把 Line 的空心区域填满：
@@ -142,7 +132,7 @@ Logo 分类也提供 Line/Fill 形式，例如 Apple。品牌图标的轮廓由�
 - 将黑色替换为 `currentColor`
 - 移除 `preserveAspectRatio="none"` 和内联样式
 - 保留 `viewBox="0 0 24 24"`
-- 除 Line SVG 中默认隐藏的 `Original` 编辑源层外，避免 stroke、位图、文字和滤镜
+- 避免运行时 stroke、位图、文字和滤镜
 
 ## Catalog Board 结构
 
@@ -184,7 +174,7 @@ Editor 单态板：
 - 根据轮廓类型使用 17×17 方形、15×19 竖向、19×15 横向或 19×19 圆形光学盒。
 - 光学盒约束内部可见几何；不得通过修改 `viewBox` 或非等比拉伸伪造尺寸。
 - 主重量从约 1.86–2 px 开始，再做光学校正。
-- Line 的可见 `Outlined` 使用填充轮廓，并保留隐藏的可编辑 `Original` 描边源层；Fill 需要独立重绘。
+- Line 最终使用填充轮廓，Fill 需要独立重绘。
 - 默认生成完整 Line/Fill 对；Editor/排版符号和明确例外可保持单态。
 - 命名、配对和真实库存必须自动校验。
 - 产品 SVG 必须从 Figma 原始黑色导出规范化为 `currentColor`。

@@ -37,9 +37,6 @@
 
 - 文件名：
 - 组件名：
-- Line 双层结构：Original 隐藏描边 / Outlined 可见轮廓 / 不适用
-- Original / Outlined 重合检查：
-- Figma 粘贴后顶层图层检查：
 - 可访问名称建议：
 - 目标显示尺寸：
 - 验收人/验收标准：
