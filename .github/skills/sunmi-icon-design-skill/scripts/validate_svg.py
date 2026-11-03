@@ -10,6 +10,8 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+from svg_geometry import GeometryError, measure_svg_bounds
+
 
 SVG_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 NUMBER = re.compile(r"^\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+))(?:px)?\s*$")
@@ -40,6 +42,10 @@ BLACK_VALUES = {
     "rgb(0,0,0)",
     "rgba(0,0,0,1)",
 }
+NON_CIRCLE_AREA = 289.0
+AREA_TOLERANCE = 1.0
+CIRCLE_SIZE = 19.0
+CIRCLE_TOLERANCE = 0.1
 
 
 @dataclass(frozen=True)
@@ -92,7 +98,11 @@ def normalized_paint(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip()).lower()
 
 
-def validate_file(path: Path, allow_black: bool = False) -> list[Issue]:
+def validate_file(
+    path: Path,
+    allow_black: bool = False,
+    size_class: str | None = None,
+) -> list[Issue]:
     issues: list[Issue] = []
 
     if not SVG_NAME.fullmatch(path.stem):
@@ -203,7 +213,67 @@ def validate_file(path: Path, allow_black: bool = False) -> list[Issue]:
             )
         )
 
+    if size_class is not None:
+        issues.extend(validate_visible_bounds(path, size_class))
+
     return deduplicate_issues(issues)
+
+
+def validate_visible_bounds(path: Path, size_class: str) -> list[Issue]:
+    if size_class not in {"auto", "circle", "non-circle"}:
+        raise ValueError(f"Unsupported size class: {size_class}")
+
+    try:
+        bounds = measure_svg_bounds(path)
+    except GeometryError as error:
+        return [Issue("ERROR", path, f"Cannot measure visible bounds: {error}")]
+
+    issues: list[Issue] = []
+    if (
+        bounds.min_x < -CIRCLE_TOLERANCE
+        or bounds.min_y < -CIRCLE_TOLERANCE
+        or bounds.max_x > 24 + CIRCLE_TOLERANCE
+        or bounds.max_y > 24 + CIRCLE_TOLERANCE
+    ):
+        issues.append(Issue("ERROR", path, "Visible geometry extends outside the 24x24 viewBox."))
+
+    resolved_class = size_class
+    if size_class == "auto":
+        is_strict_circle_box = (
+            abs(bounds.width - CIRCLE_SIZE) <= CIRCLE_TOLERANCE
+            and abs(bounds.height - CIRCLE_SIZE) <= CIRCLE_TOLERANCE
+            and abs(bounds.center_x - 12) <= CIRCLE_TOLERANCE
+            and abs(bounds.center_y - 12) <= CIRCLE_TOLERANCE
+        )
+        resolved_class = "circle" if is_strict_circle_box else "non-circle"
+
+    if resolved_class == "circle":
+        if (
+            abs(bounds.width - CIRCLE_SIZE) > CIRCLE_TOLERANCE
+            or abs(bounds.height - CIRCLE_SIZE) > CIRCLE_TOLERANCE
+            or abs(bounds.center_x - 12) > CIRCLE_TOLERANCE
+            or abs(bounds.center_y - 12) > CIRCLE_TOLERANCE
+        ):
+            issues.append(
+                Issue(
+                    "ERROR",
+                    path,
+                    "Circular icons must have 19x19 visible bounds centered at (12,12); "
+                    f"found {bounds.width:.4f}x{bounds.height:.4f} centered at "
+                    f"({bounds.center_x:.4f},{bounds.center_y:.4f}).",
+                )
+            )
+    elif abs(bounds.area - NON_CIRCLE_AREA) > AREA_TOLERANCE:
+        issues.append(
+            Issue(
+                "ERROR",
+                path,
+                "Non-circular visible bounds must have area 289 px^2 (17x17) "
+                f"within +/-{AREA_TOLERANCE:g}; found {bounds.width:.4f}x"
+                f"{bounds.height:.4f} = {bounds.area:.4f} px^2.",
+            )
+        )
+    return issues
 
 
 def deduplicate_issues(issues: list[Issue]) -> list[Issue]:
@@ -277,6 +347,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return a failing status when warnings are present.",
     )
+    parser.add_argument(
+        "--size-class",
+        choices=("auto", "circle", "non-circle"),
+        help=(
+            "Validate visible bounds: non-circle requires 289 px^2, circle requires "
+            "19x19 centered at (12,12), and auto accepts either rule."
+        ),
+    )
+    parser.add_argument(
+        "--report-bounds",
+        action="store_true",
+        help="Print measured visible bounds and bounding-box area for every SVG.",
+    )
     return parser
 
 
@@ -289,13 +372,32 @@ def main(argv: list[str] | None = None) -> int:
 
     issues: list[Issue] = []
     for path in paths:
-        issues.extend(validate_file(path, allow_black=args.allow_black))
+        issues.extend(
+            validate_file(
+                path,
+                allow_black=args.allow_black,
+                size_class=args.size_class,
+            )
+        )
     if args.require_pairs:
         issues.extend(validate_variant_pairs(paths))
 
     issues = deduplicate_issues(issues)
     for issue in issues:
         print(f"[{issue.severity}] {issue.path}: {issue.message}")
+
+    if args.report_bounds:
+        for path in paths:
+            try:
+                bounds = measure_svg_bounds(path)
+            except GeometryError as error:
+                print(f"[BOUNDS] {path}: unavailable ({error})")
+                continue
+            print(
+                f"[BOUNDS] {path}: x={bounds.min_x:.4f}, y={bounds.min_y:.4f}, "
+                f"width={bounds.width:.4f}, height={bounds.height:.4f}, "
+                f"area={bounds.area:.4f}"
+            )
 
     errors = sum(issue.severity == "ERROR" for issue in issues)
     warnings = sum(issue.severity == "WARN" for issue in issues)

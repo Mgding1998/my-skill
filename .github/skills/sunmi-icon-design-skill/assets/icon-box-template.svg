@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <g id="horizontal-19x15" stroke="black" stroke-opacity=".5" stroke-width=".05">
-    <rect x="2.525" y="4.525" width="18.95" height="14.95"/>
+  <g id="horizontal-ratio-19x15-area-289" stroke="black" stroke-opacity=".5" stroke-width=".05">
+    <rect x="2.4586" y="4.4726" width="19.0829" height="15.0549"/>
   </g>
-  <g id="horizontal-20x14" stroke="black" stroke-opacity=".5" stroke-width=".05">
-    <rect x="2.025" y="5.025" width="19.95" height="13.95"/>
+  <g id="horizontal-ratio-20x14-area-289" stroke="black" stroke-opacity=".5" stroke-width=".05">
+    <rect x="1.8656" y="4.9134" width="20.2689" height="14.1732"/>
   </g>
-  <g id="vertical-15x19" stroke="black" stroke-opacity=".5" stroke-width=".05">
-    <rect x="4.525" y="2.525" width="14.95" height="18.95"/>
+  <g id="vertical-ratio-15x19-area-289" stroke="black" stroke-opacity=".5" stroke-width=".05">
+    <rect x="4.4726" y="2.4586" width="15.0549" height="19.0829"/>
   </g>
-  <g id="vertical-14x20" stroke="black" stroke-opacity=".5" stroke-width=".05">
-    <rect x="5.025" y="2.025" width="13.95" height="19.95"/>
+  <g id="vertical-ratio-14x20-area-289" stroke="black" stroke-opacity=".5" stroke-width=".05">
+    <rect x="4.9134" y="1.8656" width="14.1732" height="20.2689"/>
   </g>
   <g id="circle-19" stroke="black" stroke-opacity=".5" stroke-width=".05">
     <circle cx="12" cy="12" r="9.475"/>
@@ -17,7 +17,7 @@
   <g id="square-17" stroke="black" stroke-opacity=".5" stroke-width=".05">
     <rect x="3.525" y="3.525" width="16.95" height="16.95"/>
   </g>
-  <g id="triangle-19x16" stroke="black" stroke-opacity=".5" stroke-width=".05">
-    <path d="M12 3.5 21.5 19.5H2.5L12 3.5Z"/>
+  <g id="triangle-ratio-19x16-area-289" stroke="black" stroke-opacity=".5" stroke-width=".05">
+    <path d="M12 4.1999 21.2627 19.8001H2.7373L12 4.1999Z"/>
   </g>
 </svg>

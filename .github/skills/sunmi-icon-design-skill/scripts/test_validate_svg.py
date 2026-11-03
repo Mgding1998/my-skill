@@ -2,6 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from svg_geometry import measure_svg_bounds
 from validate_svg import validate_file, validate_variant_pairs
 
 
@@ -67,6 +68,58 @@ class ValidateSvgTests(unittest.TestCase):
             self.assertEqual(len(validate_variant_pairs([line])), 1)
             fill = self.write_svg(directory, "home-fill.svg")
             self.assertEqual(validate_variant_pairs([line, fill]), [])
+
+    def test_non_circular_bounds_accept_289_square_pixels(self) -> None:
+        svg = """\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <rect x="3.5" y="3.5" width="17" height="17" fill="currentColor"/>
+</svg>
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_svg(directory, "box-line.svg", svg)
+            self.assertEqual(validate_file(path, size_class="non-circle"), [])
+            bounds = measure_svg_bounds(path)
+            self.assertEqual((bounds.width, bounds.height, bounds.area), (17, 17, 289))
+
+    def test_non_circular_bounds_reject_20_by_16(self) -> None:
+        svg = """\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <path fill="currentColor" d="M2 4h20v16H2z"/>
+</svg>
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_svg(directory, "carousel-line.svg", svg)
+            messages = [
+                issue.message
+                for issue in validate_file(path, size_class="non-circle")
+            ]
+            self.assertTrue(any("289 px^2" in message for message in messages))
+            self.assertTrue(any("320.0000" in message for message in messages))
+
+    def test_circle_bounds_require_19_by_19_at_canvas_center(self) -> None:
+        svg = """\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <circle cx="12" cy="12" r="9.5" fill="currentColor"/>
+</svg>
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_svg(directory, "face-line.svg", svg)
+            self.assertEqual(validate_file(path, size_class="circle"), [])
+            self.assertEqual(validate_file(path, size_class="auto"), [])
+
+    def test_transforms_are_included_in_visible_bounds(self) -> None:
+        svg = """\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <g transform="translate(3.5 3.5)">
+    <path fill="currentColor" d="M0 0h17v17H0z"/>
+  </g>
+</svg>
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_svg(directory, "box-fill.svg", svg)
+            bounds = measure_svg_bounds(path)
+            self.assertEqual((bounds.min_x, bounds.min_y), (3.5, 3.5))
+            self.assertEqual((bounds.width, bounds.height, bounds.area), (17, 17, 289))
 
 
 if __name__ == "__main__":
