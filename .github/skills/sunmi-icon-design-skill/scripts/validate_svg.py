@@ -10,11 +10,17 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
-from svg_geometry import GeometryError, measure_svg_bounds
+from svg_geometry import Bounds, GeometryError, measure_svg_bounds
 
 
+SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 SVG_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 NUMBER = re.compile(r"^\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+))(?:px)?\s*$")
+URL_FUNCTION = re.compile(r"url\s*\(", re.IGNORECASE)
+UNSAFE_DOCUMENT_PATTERNS = {
+    "<!doctype": "DOCTYPE declarations are not allowed in production SVGs.",
+    "<?xml-stylesheet": "External XML stylesheets are not allowed in production SVGs.",
+}
 FORBIDDEN_TAGS = {
     "animate",
     "animateMotion",
@@ -23,17 +29,25 @@ FORBIDDEN_TAGS = {
     "image",
     "script",
     "set",
+    "style",
     "text",
+    "use",
 }
 COMPLEX_TAGS = {
     "clipPath",
+    "defs",
     "filter",
     "linearGradient",
     "mask",
     "pattern",
     "radialGradient",
+    "symbol",
 }
 VECTOR_TAGS = {"circle", "ellipse", "line", "path", "polygon", "polyline", "rect"}
+KNOWN_TAGS = (
+    {"desc", "g", "svg", "title"} | FORBIDDEN_TAGS | COMPLEX_TAGS | VECTOR_TAGS
+)
+NON_RENDERING_CONTAINERS = COMPLEX_TAGS
 BLACK_VALUES = {
     "#000",
     "#000000",
@@ -57,6 +71,12 @@ class Issue:
 
 def local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
+
+
+def namespace_name(tag: str) -> str:
+    if tag.startswith("{") and "}" in tag:
+        return tag[1:].split("}", 1)[0]
+    return ""
 
 
 def parse_style(raw: str | None) -> dict[str, str]:
@@ -115,12 +135,30 @@ def validate_file(
         )
 
     try:
-        root = ET.parse(path).getroot()
-    except (ET.ParseError, OSError) as error:
+        raw_svg = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        return issues + [Issue("ERROR", path, f"Cannot read SVG: {error}")]
+
+    lowered_svg = raw_svg.lower()
+    for marker, message in UNSAFE_DOCUMENT_PATTERNS.items():
+        if marker in lowered_svg:
+            issues.append(Issue("ERROR", path, message))
+
+    try:
+        root = ET.fromstring(raw_svg)
+    except ET.ParseError as error:
         return issues + [Issue("ERROR", path, f"Cannot parse SVG: {error}")]
 
     if local_name(root.tag) != "svg":
         return issues + [Issue("ERROR", path, "Root element must be <svg>.")]
+    if namespace_name(root.tag) != SVG_NAMESPACE:
+        issues.append(
+            Issue(
+                "ERROR",
+                path,
+                f'Root <svg> must use xmlns="{SVG_NAMESPACE}".',
+            )
+        )
 
     if not is_close_sequence(parse_view_box(root.get("viewBox")), [0.0, 0.0, 24.0, 24.0]):
         issues.append(Issue("ERROR", path, 'viewBox must be exactly "0 0 24 24".'))
@@ -137,19 +175,36 @@ def validate_file(
             Issue("ERROR", path, 'Remove preserveAspectRatio="none" to prevent distortion.')
         )
 
-    if root.get("style"):
-        issues.append(Issue("WARN", path, "Remove inline style from the SVG root."))
-
-    vector_count = 0
-    visible_fill_count = 0
-
-    def walk(element: ET.Element, inherited_fill: str, inherited_stroke: str) -> None:
-        nonlocal vector_count, visible_fill_count
-
+    def walk(
+        element: ET.Element,
+        inherited_fill: str,
+        inherited_stroke: str,
+        rendered_context: bool,
+    ) -> None:
         tag = local_name(element.tag)
         style = parse_style(element.get("style"))
         fill = style.get("fill", element.get("fill", inherited_fill))
         stroke = style.get("stroke", element.get("stroke", inherited_stroke))
+
+        if namespace_name(element.tag) != SVG_NAMESPACE:
+            issues.append(
+                Issue("ERROR", path, f"Element <{tag}> must use the SVG namespace.")
+            )
+
+        for raw_name, value in element.attrib.items():
+            name = local_name(raw_name).lower()
+            if name.startswith("on"):
+                issues.append(
+                    Issue("ERROR", path, f'Event attribute "{name}" is not allowed.')
+                )
+            if name == "href":
+                issues.append(
+                    Issue("ERROR", path, f'External/reference attribute "{name}" is not allowed.')
+                )
+            if URL_FUNCTION.search(value):
+                issues.append(
+                    Issue("ERROR", path, f'URL-valued attribute "{name}" is not allowed.')
+                )
 
         if tag in FORBIDDEN_TAGS:
             issues.append(Issue("ERROR", path, f"Forbidden SVG element <{tag}>."))
@@ -161,12 +216,18 @@ def validate_file(
                     f"Complex element <{tag}> is outside the simple monochrome icon contract.",
                 )
             )
+        elif tag not in KNOWN_TAGS:
+            issues.append(Issue("ERROR", path, f"Unsupported SVG element <{tag}>."))
 
         if element.get("style"):
             issues.append(Issue("WARN", path, f"Remove inline style from <{tag}>."))
+        if element.get("class"):
+            issues.append(Issue("WARN", path, f"Remove class from <{tag}>."))
 
-        if tag in VECTOR_TAGS:
-            vector_count += 1
+        current_rendered_context = (
+            rendered_context and tag not in NON_RENDERING_CONTAINERS
+        )
+        if current_rendered_context and tag in VECTOR_TAGS:
             normalized_fill = normalized_paint(fill)
             normalized_stroke = normalized_paint(stroke)
 
@@ -179,12 +240,20 @@ def validate_file(
                     )
                 )
 
-            if normalized_fill == "currentcolor":
-                visible_fill_count += 1
+            if tag == "line":
+                issues.append(
+                    Issue(
+                        "ERROR",
+                        path,
+                        "<line> cannot produce filled production geometry; expand it to a path.",
+                    )
+                )
+            elif normalized_fill == "currentcolor":
+                pass
             elif normalized_fill in {"", "none"}:
                 pass
             elif allow_black and normalized_fill in BLACK_VALUES:
-                visible_fill_count += 1
+                pass
             else:
                 issues.append(
                     Issue(
@@ -198,35 +267,33 @@ def validate_file(
                 issues.append(Issue("ERROR", path, "<path> must have non-empty d data."))
 
         for child in element:
-            walk(child, fill, stroke)
+            walk(child, fill, stroke, current_rendered_context)
 
-    walk(root, "black", "none")
-
-    if vector_count == 0:
-        issues.append(Issue("ERROR", path, "SVG must contain vector geometry."))
-    elif visible_fill_count == 0:
-        issues.append(
-            Issue(
-                "ERROR",
-                path,
-                "SVG has no visible currentColor fill geometry.",
-            )
-        )
-
-    if size_class is not None:
-        issues.extend(validate_visible_bounds(path, size_class))
-
-    return deduplicate_issues(issues)
-
-
-def validate_visible_bounds(path: Path, size_class: str) -> list[Issue]:
-    if size_class not in {"auto", "circle", "non-circle"}:
-        raise ValueError(f"Unsupported size class: {size_class}")
+    walk(root, "black", "none", True)
 
     try:
         bounds = measure_svg_bounds(path)
     except GeometryError as error:
-        return [Issue("ERROR", path, f"Cannot measure visible bounds: {error}")]
+        issues.append(Issue("ERROR", path, f"Cannot measure visible bounds: {error}"))
+    else:
+        issues.extend(validate_visible_bounds(path, size_class, bounds))
+
+    return deduplicate_issues(issues)
+
+
+def validate_visible_bounds(
+    path: Path,
+    size_class: str | None,
+    bounds: Bounds | None = None,
+) -> list[Issue]:
+    if size_class is not None and size_class not in {"auto", "circle", "non-circle"}:
+        raise ValueError(f"Unsupported size class: {size_class}")
+
+    if bounds is None:
+        try:
+            bounds = measure_svg_bounds(path)
+        except GeometryError as error:
+            return [Issue("ERROR", path, f"Cannot measure visible bounds: {error}")]
 
     issues: list[Issue] = []
     if (
@@ -236,6 +303,9 @@ def validate_visible_bounds(path: Path, size_class: str) -> list[Issue]:
         or bounds.max_y > 24 + CIRCLE_TOLERANCE
     ):
         issues.append(Issue("ERROR", path, "Visible geometry extends outside the 24x24 viewBox."))
+
+    if size_class is None:
+        return issues
 
     resolved_class = size_class
     if size_class == "auto":
@@ -287,8 +357,12 @@ def deduplicate_issues(issues: list[Issue]) -> list[Issue]:
     return result
 
 
-def validate_variant_pairs(paths: list[Path]) -> list[Issue]:
+def validate_variant_pairs(
+    paths: list[Path],
+    require_variant_suffix: bool = False,
+) -> list[Issue]:
     by_directory: dict[Path, dict[str, dict[str, Path]]] = {}
+    issues: list[Issue] = []
     for path in paths:
         stem = path.stem
         if stem.endswith("-line"):
@@ -296,10 +370,17 @@ def validate_variant_pairs(paths: list[Path]) -> list[Issue]:
         elif stem.endswith("-fill"):
             base, variant = stem[:-5], "fill"
         else:
+            if require_variant_suffix:
+                issues.append(
+                    Issue(
+                        "ERROR",
+                        path,
+                        "File must end in -line.svg or -fill.svg for a paired delivery.",
+                    )
+                )
             continue
         by_directory.setdefault(path.parent, {}).setdefault(base, {})[variant] = path
 
-    issues: list[Issue] = []
     for groups in by_directory.values():
         for base, variants in sorted(groups.items()):
             missing = {"line", "fill"} - variants.keys()
@@ -343,9 +424,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Require every *-line.svg to have *-fill.svg in the same directory and vice versa.",
     )
     parser.add_argument(
+        "--require-variant-suffix",
+        action="store_true",
+        help=(
+            "Reject files without -line.svg or -fill.svg and require complete pairs. "
+            "Use only for paired icon sets, not Editor-style singletons."
+        ),
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
-        help="Return a failing status when warnings are present.",
+        help="Treat warnings as errors; this does not add manual visual checks.",
     )
     parser.add_argument(
         "--size-class",
@@ -379,8 +468,13 @@ def main(argv: list[str] | None = None) -> int:
                 size_class=args.size_class,
             )
         )
-    if args.require_pairs:
-        issues.extend(validate_variant_pairs(paths))
+    if args.require_pairs or args.require_variant_suffix:
+        issues.extend(
+            validate_variant_pairs(
+                paths,
+                require_variant_suffix=args.require_variant_suffix,
+            )
+        )
 
     issues = deduplicate_issues(issues)
     for issue in issues:

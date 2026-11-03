@@ -21,7 +21,7 @@
 - 分别设计 Line 和 Fill；Line 的主体语义部件保持线性轮廓，不用大面积实心块冒充 Line
 - 检查视觉中心、负空间、黑色面积和小尺寸辨识度
 - 输出使用 `currentColor`、透明背景和填充轮廓的生产 SVG
-- 校验 SVG 结构、命名、颜色及 Line/Fill 配对
+- 校验 SVG 结构、命名、颜色、可见几何、画布范围及 Line/Fill 配对
 
 外部参考图只用于提取对象语义、动作、必要识别特征和方向；圆角、线宽、端点、比例、负空间及 Fill 策略必须由 SUNMI 规范决定。
 
@@ -41,13 +41,22 @@
 
 ### 校验
 
+脚本自动检查 XML/SVG namespace、允许的元素与属性、颜色、可见填充几何、画布范围、可选尺寸规则及变体配对。主视觉重量、转角语言、视觉中心、连接质量和 16/20/24/32 px 可读性仍需按 Skill 清单人工检查。
+
+`--strict` 仅表示将 warning 也视为失败，不会启用额外的视觉判断。混合目录可用 `--size-class auto` 初筛，但交付前仍应按语义分别确认圆形与非圆形类别。
+
 ```bash
 python3 -m unittest discover \
   -s .github/skills/sunmi-icon-design-skill/scripts \
   -p 'test_*.py' -v
 
 python3 .github/skills/sunmi-icon-design-skill/scripts/validate_svg.py \
-  path/to/icons --require-pairs --strict
+  path/to/icons --require-pairs --size-class auto --report-bounds --strict
+
+# 仅包含 Line/Fill 成对资产的目录可额外禁止无变体后缀文件
+python3 .github/skills/sunmi-icon-design-skill/scripts/validate_svg.py \
+  path/to/paired-icons --require-pairs --require-variant-suffix \
+  --size-class non-circle --report-bounds --strict
 ```
 
 ## 仓库结构

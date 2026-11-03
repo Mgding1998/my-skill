@@ -83,6 +83,12 @@ class Bounds:
         self.max_x = max(self.max_x, x)
         self.max_y = max(self.max_y, y)
 
+    def include_bounds(self, other: "Bounds") -> None:
+        if other.is_empty:
+            return
+        self.include((other.min_x, other.min_y))
+        self.include((other.max_x, other.max_y))
+
 
 def local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
@@ -117,6 +123,35 @@ def transform_point(matrix: Matrix, point: Point) -> Point:
     a, b, c, d, e, f = matrix
     x, y = point
     return a * x + c * y + e, b * x + d * y + f
+
+
+def matrix_preserves_area(matrix: Matrix) -> bool:
+    a, b, c, d, _, _ = matrix
+    return abs(a * d - b * c) > 1e-12
+
+
+def points_span_area(points: list[Point]) -> bool:
+    if len(points) < 3:
+        return False
+
+    origin = points[0]
+    baseline: Point | None = None
+    for point in points[1:]:
+        if math.dist(origin, point) > 1e-10:
+            baseline = point
+            break
+    if baseline is None:
+        return False
+
+    dx = baseline[0] - origin[0]
+    dy = baseline[1] - origin[1]
+    for point in points[1:]:
+        px = point[0] - origin[0]
+        py = point[1] - origin[1]
+        scale = max(1.0, abs(dx), abs(dy), abs(px), abs(py))
+        if abs(dx * py - dy * px) > 1e-10 * scale * scale:
+            return True
+    return False
 
 
 def parse_numbers(raw: str) -> list[float]:
@@ -452,7 +487,7 @@ def include_arc(
     )
 
 
-def include_path(bounds: Bounds, matrix: Matrix, data: str) -> None:
+def include_path(bounds: Bounds, matrix: Matrix, data: str) -> bool:
     tokens = tokenize_path(data)
     index = 0
     command: str | None = None
@@ -461,14 +496,37 @@ def include_path(bounds: Bounds, matrix: Matrix, data: str) -> None:
     previous_command: str | None = None
     previous_cubic_control: Point | None = None
     previous_quadratic_control: Point | None = None
+    subpath_bounds = Bounds()
+    subpath_points: list[Point] = []
+    subpath_has_arc = False
+    has_fill_area = False
+
+    def ensure_subpath() -> None:
+        if not subpath_points:
+            subpath_points.append(transform_point(matrix, current))
+
+    def add_point(point: Point) -> None:
+        subpath_points.append(transform_point(matrix, point))
+
+    def finalize_subpath() -> None:
+        nonlocal subpath_bounds, subpath_points, subpath_has_arc, has_fill_area
+        if subpath_has_arc or points_span_area(subpath_points):
+            bounds.include_bounds(subpath_bounds)
+            has_fill_area = True
+        subpath_bounds = Bounds()
+        subpath_points = []
+        subpath_has_arc = False
 
     while index < len(tokens):
         if is_command(tokens[index]):
             command = tokens[index]
             index += 1
             if command.upper() == "Z":
-                include_line(bounds, matrix, current, subpath_start)
+                ensure_subpath()
+                include_line(subpath_bounds, matrix, current, subpath_start)
+                add_point(subpath_start)
                 current = subpath_start
+                finalize_subpath()
                 previous_command = "Z"
                 previous_cubic_control = None
                 previous_quadratic_control = None
@@ -491,37 +549,48 @@ def include_path(bounds: Bounds, matrix: Matrix, data: str) -> None:
         relative = command.islower()
 
         if upper == "M":
+            finalize_subpath()
             current = relative_point(current, values[0], values[1], relative)
             subpath_start = current
+            subpath_points = [transform_point(matrix, current)]
             previous_cubic_control = None
             previous_quadratic_control = None
             previous_command = "M"
             command = "l" if relative else "L"
             continue
 
+        ensure_subpath()
         if upper == "L":
             end = relative_point(current, values[0], values[1], relative)
-            include_line(bounds, matrix, current, end)
+            include_line(subpath_bounds, matrix, current, end)
+            add_point(end)
             current = end
         elif upper == "H":
             end = (
                 current[0] + values[0] if relative else values[0],
                 current[1],
             )
-            include_line(bounds, matrix, current, end)
+            include_line(subpath_bounds, matrix, current, end)
+            add_point(end)
             current = end
         elif upper == "V":
             end = (
                 current[0],
                 current[1] + values[0] if relative else values[0],
             )
-            include_line(bounds, matrix, current, end)
+            include_line(subpath_bounds, matrix, current, end)
+            add_point(end)
             current = end
         elif upper == "C":
             control1 = relative_point(current, values[0], values[1], relative)
             control2 = relative_point(current, values[2], values[3], relative)
             end = relative_point(current, values[4], values[5], relative)
-            include_cubic(bounds, matrix, current, control1, control2, end)
+            include_cubic(
+                subpath_bounds, matrix, current, control1, control2, end
+            )
+            add_point(control1)
+            add_point(control2)
+            add_point(end)
             current = end
             previous_cubic_control = control2
         elif upper == "S":
@@ -535,13 +604,20 @@ def include_path(bounds: Bounds, matrix: Matrix, data: str) -> None:
             )
             control2 = relative_point(current, values[0], values[1], relative)
             end = relative_point(current, values[2], values[3], relative)
-            include_cubic(bounds, matrix, current, control1, control2, end)
+            include_cubic(
+                subpath_bounds, matrix, current, control1, control2, end
+            )
+            add_point(control1)
+            add_point(control2)
+            add_point(end)
             current = end
             previous_cubic_control = control2
         elif upper == "Q":
             control = relative_point(current, values[0], values[1], relative)
             end = relative_point(current, values[2], values[3], relative)
-            include_quadratic(bounds, matrix, current, control, end)
+            include_quadratic(subpath_bounds, matrix, current, control, end)
+            add_point(control)
+            add_point(end)
             current = end
             previous_quadratic_control = control
         elif upper == "T":
@@ -554,7 +630,9 @@ def include_path(bounds: Bounds, matrix: Matrix, data: str) -> None:
                 else current
             )
             end = relative_point(current, values[0], values[1], relative)
-            include_quadratic(bounds, matrix, current, control, end)
+            include_quadratic(subpath_bounds, matrix, current, control, end)
+            add_point(control)
+            add_point(end)
             current = end
             previous_quadratic_control = control
         elif upper == "A":
@@ -562,7 +640,7 @@ def include_path(bounds: Bounds, matrix: Matrix, data: str) -> None:
                 raise GeometryError("SVG arc flags must be 0 or 1.")
             end = relative_point(current, values[5], values[6], relative)
             include_arc(
-                bounds,
+                subpath_bounds,
                 matrix,
                 current,
                 values[0],
@@ -572,6 +650,14 @@ def include_path(bounds: Bounds, matrix: Matrix, data: str) -> None:
                 bool(values[4]),
                 end,
             )
+            if (
+                values[0] != 0
+                and values[1] != 0
+                and current != end
+                and matrix_preserves_area(matrix)
+            ):
+                subpath_has_arc = True
+            add_point(end)
             current = end
 
         if upper not in {"C", "S"}:
@@ -579,6 +665,9 @@ def include_path(bounds: Bounds, matrix: Matrix, data: str) -> None:
         if upper not in {"Q", "T"}:
             previous_quadratic_control = None
         previous_command = upper
+
+    finalize_subpath()
+    return has_fill_area
 
 
 def attribute_number(
@@ -599,41 +688,57 @@ def attribute_number(
         ) from error
 
 
-def include_element(bounds: Bounds, element: ET.Element, matrix: Matrix) -> None:
+def include_element(bounds: Bounds, element: ET.Element, matrix: Matrix) -> bool:
     tag = local_name(element.tag)
     if tag == "path":
         data = (element.get("d") or "").strip()
         if data:
-            include_path(bounds, matrix, data)
+            return include_path(bounds, matrix, data)
     elif tag == "circle":
         center = (
             attribute_number(element, "cx", 0),
             attribute_number(element, "cy", 0),
         )
         radius = attribute_number(element, "r")
+        if radius < 0:
+            raise GeometryError("<circle> radius cannot be negative.")
+        if radius == 0 or not matrix_preserves_area(matrix):
+            return False
         include_ellipse_arc(
             bounds, matrix, center, radius, radius, 0, 0, 2 * math.pi
         )
+        return True
     elif tag == "ellipse":
         center = (
             attribute_number(element, "cx", 0),
             attribute_number(element, "cy", 0),
         )
+        rx = attribute_number(element, "rx")
+        ry = attribute_number(element, "ry")
+        if rx < 0 or ry < 0:
+            raise GeometryError("<ellipse> radii cannot be negative.")
+        if rx == 0 or ry == 0 or not matrix_preserves_area(matrix):
+            return False
         include_ellipse_arc(
             bounds,
             matrix,
             center,
-            attribute_number(element, "rx"),
-            attribute_number(element, "ry"),
+            rx,
+            ry,
             0,
             0,
             2 * math.pi,
         )
+        return True
     elif tag == "rect":
         x = attribute_number(element, "x", 0)
         y = attribute_number(element, "y", 0)
         width = attribute_number(element, "width")
         height = attribute_number(element, "height")
+        if width < 0 or height < 0:
+            raise GeometryError("<rect> width and height cannot be negative.")
+        if width == 0 or height == 0 or not matrix_preserves_area(matrix):
+            return False
         for point in (
             (x, y),
             (x + width, y),
@@ -641,19 +746,21 @@ def include_element(bounds: Bounds, element: ET.Element, matrix: Matrix) -> None
             (x, y + height),
         ):
             bounds.include(transform_point(matrix, point))
-    elif tag == "line":
-        include_line(
-            bounds,
-            matrix,
-            (attribute_number(element, "x1", 0), attribute_number(element, "y1", 0)),
-            (attribute_number(element, "x2", 0), attribute_number(element, "y2", 0)),
-        )
+        return True
     elif tag in {"polygon", "polyline"}:
         values = parse_numbers(element.get("points") or "")
         if len(values) % 2:
             raise GeometryError(f"<{tag}> points must contain x/y pairs.")
-        for index in range(0, len(values), 2):
-            bounds.include(transform_point(matrix, (values[index], values[index + 1])))
+        points = [
+            transform_point(matrix, (values[index], values[index + 1]))
+            for index in range(0, len(values), 2)
+        ]
+        if not points_span_area(points):
+            return False
+        for point in points:
+            bounds.include(point)
+        return True
+    return False
 
 
 def measure_svg_bounds(path: Path) -> Bounds:
@@ -692,9 +799,11 @@ def measure_svg_bounds(path: Path) -> Bounds:
             raise GeometryError("Opacity values must be numeric.") from error
 
         matrix = compose(parent_matrix, parse_transform(element.get("transform")))
-        if tag in {"circle", "ellipse", "line", "path", "polygon", "polyline", "rect"}:
+        if tag in {"circle", "ellipse", "path", "polygon", "polyline", "rect"}:
             if fill not in {"", "none"} and opacity > 0 and fill_opacity > 0:
-                include_element(bounds, element, matrix)
+                element_bounds = Bounds()
+                if include_element(element_bounds, element, matrix):
+                    bounds.include_bounds(element_bounds)
 
         for child in element:
             walk(child, matrix, fill, opacity)

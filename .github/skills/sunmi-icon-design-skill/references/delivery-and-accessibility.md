@@ -12,12 +12,14 @@
 
 要求：
 
+- 根节点必须保留标准 SVG namespace：`xmlns="http://www.w3.org/2000/svg"`。
 - `viewBox` 必须是 `0 0 24 24`。
 - 24×24 是固定画布；内部可见几何必须符合[图标盒尺寸规则](./optical-sizing.md)：非圆形保持自然比例并把联合包围盒面积归一到 289 px²，圆形严格为 19×19，不能通过修改 `viewBox` 或非等比拉伸校正大小。
 - 可以保留 `width="24"` 和 `height="24"` 作为默认尺寸，也可以由组件层设置。
 - 路径使用 `currentColor`，不要写死黑色。
 - 根节点不要使用 `preserveAspectRatio="none"`。
-- 不包含 `style`、`script`、`image`、`text`、`foreignObject`、滤镜或动画。
+- 不包含 `style`、`script`、`image`、`text`、`foreignObject`、滤镜、动画或未知元素。
+- 不包含 `onload`、`onclick` 等事件属性、`href`/`xlink:href` 引用、外部 CSS、XML stylesheet、DOCTYPE 或任何 `url(...)` 资源。
 - 最终资产不使用可见 stroke；在设计工具中用过的 stroke 应先扩展。
 - `fill="currentColor"` 只是扩展轮廓的交付方式。`*-line.svg` 的非微型主体语义部件仍必须表现为约主重量的轮廓或线带，不能以大面积实心块替代。
 - 保持透明背景。

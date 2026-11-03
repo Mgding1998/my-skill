@@ -1,9 +1,8 @@
 ---
 name: sunmi-icon-design-skill
-description: "严格按 SUNMI 视觉规范设计、补齐、重绘、校正、审查和交付 24×24 单色图标、线性图标、填充图标、Line/Fill 成对图标与 SVG 图标集；外部参考图只用于提取语义和必要结构，不继承其圆角、线宽或造型风格。Use when: 用户要求设计 icon/图标、扩展图标库、将参考图规范化为 SUNMI 风格、根据图标盒/光学盒校正实际大小、制作 line/fill 变体、统一视觉重量、命名分类、输出或检查 SVG、进行 icon audit/review。"
-argument-hint: "描述图标语义、Line/Fill、目标平台、现有参考和期望输出"
-user-invocable: true
-disable-model-invocation: false
+description: "严格按 SUNMI/商米视觉规范设计、补齐、重绘、校正、审查和交付 24×24 单色 SVG、Line/Fill 图标与图标集。Use when: 用户明确提到 SUNMI/商米、显式要求使用本 Skill、当前项目属于 SUNMI 图标库，或正在补齐/审查既有 SUNMI Line/Fill 资产。Do not use for: 通用图标、iOS/Material 等其他设计系统、App 启动图标、彩色营销图标或品牌 Logo。"
+license: "Proprietary; internal use only"
+compatibility: "Requires Python 3 for SVG validation. Full family matching requires authorized access to SUNMI references; offline use is limited to bundled rules and templates."
 ---
 
 # 图标设计
@@ -24,14 +23,14 @@ disable-model-invocation: false
 
 ## 何时使用
 
-- 新设计一个或一组产品图标
-- 给现有图标补 Line 或 Fill 变体
-- 将第三方或旧图标重绘成当前体系
-- 审查 Figma、SVG 或代码中的图标一致性
-- 建立图标命名、分类、组件、导出和验收流程
-- 修复图标视觉重量、留白、像素清晰度或无障碍问题
+- 为 SUNMI 产品新设计一个或一组图标
+- 给现有 SUNMI 图标补 Line 或 Fill 变体
+- 将第三方或旧图标重绘成 SUNMI 体系
+- 审查 SUNMI Figma、SVG 或代码中的图标一致性
+- 建立 SUNMI 图标命名、分类、组件、导出和验收流程
+- 修复 SUNMI 图标视觉重量、留白、像素清晰度或无障碍问题
 
-不要用本 Skill 绘制插画、表情包、复杂彩色徽章或营销主视觉。品牌 Logo 只做规范化接入，不擅自改变品牌几何。
+不要用本 Skill 处理通用图标、其他设计系统、App 启动图标、插画、表情包、复杂彩色徽章或营销主视觉。品牌 Logo 只做规范化接入，不擅自改变品牌几何。除非用户明确要求转换成 SUNMI 体系，否则不得覆盖其指定的 iOS、Material 或其他视觉语言。
 
 ## 工作原则
 
@@ -182,6 +181,10 @@ disable-model-invocation: false
 
 ### 9. 验证
 
+自动校验覆盖：XML 与 SVG namespace、允许的元素和危险属性、`currentColor`、运行时 stroke、可解析且非退化的可见填充几何、24×24 画布范围、可选尺寸类别、命名和变体配对。它不自动判断主视觉重量、转角类别、视觉中心、连接缝隙或多尺寸可读性；这些项目必须继续执行下面的人工视觉检查。
+
+`--strict` 只表示将 warning 也视为失败，不会启用额外的视觉规则。
+
 1. 按[质量检查清单](./references/qa-checklist.md)逐项检查。
 2. 对所有预期连接点先检查扩展后的矢量几何，再在 `400%–800%` 放大和 16/20/24/32 px 栅格预览中确认没有断口或细缝；不能只检查 stroke 中心线。
 3. 对所有微型封闭细节检查 16 px 内孔；不足约 1 px 且孔洞不承担关键语义时改用实心几何。
@@ -192,11 +195,11 @@ disable-model-invocation: false
 
    ```bash
    python3 .github/skills/sunmi-icon-design-skill/scripts/validate_svg.py \
-     path/to/non-circular-icons --require-pairs --size-class non-circle \
-     --report-bounds --strict
+     path/to/non-circular-paired-icons --require-pairs \
+     --require-variant-suffix --size-class non-circle --report-bounds --strict
    ```
 
-   圆形图标改用 `--size-class circle`；混合目录可使用 `--size-class auto`，但交付前仍要按语义分别确认分类。
+   圆形图标改用 `--size-class circle`；混合目录可使用 `--size-class auto`，但交付前仍要按语义分别确认分类。Editor 等单态图标不要使用 `--require-pairs` 或 `--require-variant-suffix`。
 
 8. 对刚从 Figma 导出的黑色原稿可先运行：
 
